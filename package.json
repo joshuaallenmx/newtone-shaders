@@ -1,0 +1,74 @@
+{
+    "name": "@newtonedev/shaders",
+    "version": "0.1.1",
+    "description": "Newtone GPU shader pipeline — Pass/Pipeline runtime, signal-driven uniforms, texture utilities, and ready-made shaders for React + Three.js",
+    "license": "MIT",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/joshuaallenmx/newtone-shaders.git"
+    },
+    "homepage": "https://newtone.dev",
+    "type": "module",
+    "main": "./dist/index.cjs",
+    "module": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "import": "./dist/index.js",
+            "require": "./dist/index.cjs"
+        }
+    },
+    "files": [
+        "dist",
+        "src"
+    ],
+    "publishConfig": {
+        "access": "public"
+    },
+    "scripts": {
+        "build": "tsup && tsc --emitDeclarationOnly",
+        "dev": "tsup --watch",
+        "test": "vitest run",
+        "test:watch": "vitest",
+        "typecheck": "tsc --noEmit",
+        "playground": "vite playground --open",
+        "playground:next": "vite playground-next --open",
+        "playground:editor": "vite playground-editor --open"
+    },
+    "peerDependencies": {
+        "react": ">=18.0.0",
+        "react-dom": ">=18.0.0",
+        "three": ">=0.160.0 <1.0.0"
+    },
+    "devDependencies": {
+        "@types/node": "^22.19.17",
+        "@types/react": "^18.2.0",
+        "@types/react-dom": "^18.3.7",
+        "@types/three": "^0.180.0",
+        "@vitejs/plugin-react": "^4.2.0",
+        "@xyflow/react": "^12.0.0",
+        "jsdom": "^25.0.0",
+        "react": "18.2.0",
+        "react-dom": "18.2.0",
+        "react-resizable-panels": "^2.0.0",
+        "three": "^0.180.0",
+        "tsup": "^8.0.0",
+        "typescript": "^5.4.0",
+        "vite": "^5.0.0",
+        "vite-plugin-top-level-await": "^1.6.0",
+        "vite-plugin-wasm": "^3.6.0",
+        "vitest": "^2.0.0"
+    },
+    "dependencies": {
+        "@huggingface/transformers": "^4.2.0",
+        "@tensorflow/tfjs": "^4.22.0",
+        "@types/d3-contour": "^3.0.6",
+        "@types/d3-delaunay": "^6.0.4",
+        "d3-contour": "^4.0.2",
+        "d3-delaunay": "^6.0.4",
+        "nsfwjs": "^4.3.0",
+        "onnxruntime-web": "^1.25.1",
+        "vectortracer": "^0.1.2"
+    }
+}

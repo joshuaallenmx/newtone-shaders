@@ -1,0 +1,17 @@
+node_modules
+dist
+**/dist
+*.log
+.DS_Store
+.vite
+coverage
+
+# Heavy local-only artifacts — out of git, keep on disk.
+# Blender sources (and the GLB exports they produce) are large binaries
+# that don't belong in source control; move them to LFS/Dropbox/Drive
+# if they need to be shared across machines.
+blender/
+playground/assets/
+playground/public/
+playground/New Folder With Items/
+playground-editor/dist/
