@@ -26,6 +26,12 @@ const CONTENT_HOST_STYLE: CSSProperties = {
     position: "relative",
     zIndex: 1,
     width: "100%",
+    // Fill the wrap's vertical space so descendants can resolve
+    // height-relative sizing (e.g. `height: 100%` or percent-of-parent
+    // measurements). The flex centering below still keeps content visually
+    // centered when it's smaller than the host.
+    flex: 1,
+    minHeight: 0,
     display: "flex",
     flexDirection: "column",
     alignItems: "center",
