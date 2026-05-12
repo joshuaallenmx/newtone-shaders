@@ -10,6 +10,13 @@ export interface TimeState {
 export interface TimeSignalControls extends Signal<TimeState> {
     /** Advance the signal — called once per render frame by the pipeline runner. */
     tick(): void;
+    /**
+     * Re-anchor the internal start timestamp so the next `tick()` continues
+     * from the current `state.time` rather than jumping forward by the
+     * wall-clock duration of the pause. Call this when resuming a paused
+     * render loop (e.g. after the canvas scrolls back into view).
+     */
+    resume(): void;
 }
 
 export interface TimeSignalOptions {
@@ -29,7 +36,7 @@ export function createTimeSignal(
 ): TimeSignalControls {
     const id = `time-${++counter}`;
     const now = opts.now ?? (() => performance.now());
-    const start = now();
+    let start = now();
     const state: TimeState = { time: 0, frame: 0 };
     const listeners = new Set<(s: TimeState) => void>();
 
@@ -50,6 +57,9 @@ export function createTimeSignal(
             state.time = (now() - start) / 1000;
             state.frame++;
             for (const fn of listeners) fn(state);
+        },
+        resume() {
+            start = now() - state.time * 1000;
         },
     };
 }

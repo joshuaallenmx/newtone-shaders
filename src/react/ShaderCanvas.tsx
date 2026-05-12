@@ -58,6 +58,12 @@ export interface ShaderCanvasProps {
      * draw vector strokes / labels via `setup.overlayHost`. @default false
      */
     readonly overlay?: boolean;
+    /**
+     * Multiplier on the renderer's effective pixel ratio (the DPR cap of 2 is
+     * applied first, then this scale). Drop below 1 on slow hardware to cut
+     * fragment cost roughly with the squared scale. @default 1
+     */
+    readonly resolutionScale?: number;
 }
 
 /**
@@ -72,6 +78,7 @@ export function ShaderCanvas({
     fillSection = true,
     canvasOverflow = 0,
     overlay = false,
+    resolutionScale,
 }: ShaderCanvasProps) {
     const wrapRef = useRef<HTMLDivElement>(null);
     const canvasHostRef = useRef<HTMLDivElement>(null);
@@ -84,6 +91,7 @@ export function ShaderCanvas({
         overlayHostRef: overlay ? overlayHostRef : undefined,
         setup,
         fillSection,
+        resolutionScale,
     });
     const canvasHostStyle: CSSProperties = {
         ...CANVAS_HOST_BASE,

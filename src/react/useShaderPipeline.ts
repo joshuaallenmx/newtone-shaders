@@ -52,6 +52,13 @@ export interface UseShaderPipelineOptions {
     readonly setup: ShaderSetup;
     /** Apply the bleed-fit layout trick to `wrap`. @default true */
     readonly fillSection?: boolean;
+    /**
+     * Multiplier on the renderer's effective pixel ratio (the DPR cap of 2 is
+     * applied first, then this scale). Drop below 1 on slow hardware to cut
+     * fragment cost roughly with the squared scale (0.75 ≈ 1.8× faster,
+     * 0.5 ≈ 4× faster). @default 1
+     */
+    readonly resolutionScale?: number;
 }
 
 /**
@@ -76,7 +83,15 @@ export function useShaderPipeline(opts: UseShaderPipelineOptions): void {
             alpha: true,
             premultipliedAlpha: false,
         });
-        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        const resolutionScale = opts.resolutionScale ?? 1;
+        // DPR cap of 1.5 (was 2): retina users render at 1.5× instead of 2×,
+        // a ~44% pixel reduction — the dominant cost in this pipeline is the
+        // 100-tap vorticity loop in BUFFER_A, which scales linearly with
+        // pixel count. The slight softness on hi-DPI displays is invisible
+        // at normal viewing distances and well worth the perf headroom.
+        renderer.setPixelRatio(
+            Math.min(window.devicePixelRatio, 1.5) * resolutionScale,
+        );
         renderer.outputColorSpace = THREE.SRGBColorSpace;
         const canvasEl = renderer.domElement;
         canvasEl.style.display = "block";
@@ -122,8 +137,24 @@ export function useShaderPipeline(opts: UseShaderPipelineOptions): void {
         ro.observe(canvasHost);
         resize();
 
+        // Visibility gate: pause the rAF loop when the canvas is fully out of
+        // view OR the tab is hidden. The IntersectionObserver uses a 200px
+        // pre-warm margin so the loop resumes shortly before the canvas
+        // re-enters the viewport — by the time it's visible, one frame is
+        // already painted, avoiding a scroll-bump on resume. `time.resume()`
+        // re-anchors the time signal so the simulation doesn't lurch forward
+        // by the pause duration.
         let raf = 0;
+        let inView = true;
+        let docVisible =
+            typeof document !== "undefined" ? !document.hidden : true;
+        const shouldRun = () => inView && docVisible;
+
         const tick = () => {
+            if (!shouldRun()) {
+                raf = 0;
+                return;
+            }
             raf = requestAnimationFrame(tick);
             setup.time?.tick();
             const t = setup.time?.get().time ?? 0;
@@ -136,10 +167,37 @@ export function useShaderPipeline(opts: UseShaderPipelineOptions): void {
             });
             setup.onFrame?.({ renderer, time: t, frame: f });
         };
-        tick();
+        const startLoop = () => {
+            if (raf !== 0 || !shouldRun()) return;
+            setup.time?.resume?.();
+            raf = requestAnimationFrame(tick);
+        };
+
+        const io = new IntersectionObserver(
+            (entries) => {
+                const next = entries[entries.length - 1]?.isIntersecting ?? true;
+                if (next === inView) return;
+                inView = next;
+                if (inView) startLoop();
+            },
+            { rootMargin: "200px 0px" },
+        );
+        io.observe(canvasHost);
+
+        const onDocVis = () => {
+            const next = !document.hidden;
+            if (next === docVisible) return;
+            docVisible = next;
+            if (docVisible) startLoop();
+        };
+        document.addEventListener("visibilitychange", onDocVis);
+
+        startLoop();
 
         return () => {
             cancelAnimationFrame(raf);
+            io.disconnect();
+            document.removeEventListener("visibilitychange", onDocVis);
             ro.disconnect();
             bleedObserver?.disconnect();
             bleed?.dispose();

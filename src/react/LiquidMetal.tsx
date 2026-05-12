@@ -17,7 +17,6 @@ import {
     makeEnvTexture,
     updateEnvTexture,
     createSvgMaskBuilder,
-    loadImageTexture,
     type SvgMaskBuilder,
 } from "../core/textures";
 import { setVec3FromColor } from "../core/color";
@@ -49,8 +48,6 @@ export interface LiquidMetalProps {
     readonly saturation?: number;
     /** Vertical gradient stops (top → bottom). @default ["#595294", "#e6de8c"] */
     readonly envColors?: readonly ColorInput[];
-    /** URL of an image to use for reflection instead of the gradient. */
-    readonly envImage?: string;
     /** Partial fluid-feel overrides, merged on top of `createDefaultParams()`. */
     readonly params?: Partial<LiquidMetalParams>;
     /** Apply bleed-fit so the canvas covers the parent section. @default true */
@@ -61,6 +58,15 @@ export interface LiquidMetalProps {
      * @default 8
      */
     readonly edgeBarrier?: number;
+    /**
+     * Multiplier on the renderer's effective pixel ratio (the DPR cap of 2 is
+     * applied first, then this scale). The fluid simulation pass is the
+     * dominant cost; fragment cost scales with pixel count, so lowering this
+     * is the highest-leverage perf knob for slow hardware. `1` preserves
+     * current look exactly; `0.75` is visibly identical at sane viewing
+     * distances; `0.5` is slightly softer but ~4× cheaper. @default 1
+     */
+    readonly resolutionScale?: number;
 }
 
 const DEFAULT_TINT = "#ffffff";
@@ -76,10 +82,10 @@ export function LiquidMetal({
     contrast = DEFAULT_CONTRAST,
     saturation = DEFAULT_SATURATION,
     envColors = DEFAULT_ENV_COLORS,
-    envImage,
     params,
     fillSection = true,
     edgeBarrier = 8,
+    resolutionScale,
 }: LiquidMetalProps) {
     const resolver = useColorResolver();
     const resolvedTint = resolver(tint);
@@ -97,7 +103,6 @@ export function LiquidMetal({
     const colorUniformsRef = useRef<LiquidMetalColorUniforms | null>(null);
     const paramsRef = useRef<LiquidMetalParams | null>(null);
     const envTexRef = useRef<THREE.DataTexture | null>(null);
-    const envImageTexRef = useRef<THREE.Texture | null>(null);
     const maskBuilderRef = useRef<SvgMaskBuilder | null>(null);
     const edgeBarrierRef = useRef(edgeBarrier);
     edgeBarrierRef.current = edgeBarrier;
@@ -126,7 +131,14 @@ export function LiquidMetal({
         });
         maskBuilderRef.current = maskBuilder;
 
-        const pointer = createPointerSignal({ host: canvasHost });
+        const pointer = createPointerSignal({
+            host: canvasHost,
+            // Use the renderer's effective DPR (which honours the cap +
+            // resolutionScale) so pointer GL coords stay aligned with the
+            // canvas pixels — not window.devicePixelRatio, which would drift
+            // whenever the renderer DPR differs from the device DPR.
+            dpr: () => renderer.getPixelRatio(),
+        });
         const scroll = createScrollSignal();
         const time = createTimeSignal();
         const mutation = createMutationSignal({ host: contentHost });
@@ -144,7 +156,7 @@ export function LiquidMetal({
             signals: { pointer, scroll },
             textures: {
                 noise,
-                env: () => envImageTexRef.current ?? env,
+                env: () => env,
                 mask: maskBuilder.texture,
             },
             colorUniforms,
@@ -170,8 +182,6 @@ export function LiquidMetal({
                 retryTimers.forEach(clearTimeout);
                 noise.dispose();
                 env.dispose();
-                envImageTexRef.current?.dispose();
-                envImageTexRef.current = null;
                 maskBuilder.dispose();
             },
         };
@@ -212,32 +222,6 @@ export function LiquidMetal({
         void mb.rebuild();
     }, [edgeBarrier]);
 
-    // Load / swap the env image when the URL changes.
-    useEffect(() => {
-        let cancelled = false;
-        if (!envImage) {
-            envImageTexRef.current?.dispose();
-            envImageTexRef.current = null;
-            return;
-        }
-        loadImageTexture(envImage)
-            .then((tex) => {
-                if (cancelled) {
-                    tex.dispose();
-                    return;
-                }
-                const previous = envImageTexRef.current;
-                envImageTexRef.current = tex;
-                previous?.dispose();
-            })
-            .catch(() => {
-                // Stay on the gradient if the image fails to load.
-            });
-        return () => {
-            cancelled = true;
-        };
-    }, [envImage]);
-
     // Push the canvas past the wrap by exactly the barrier width so the wall
     // sits in the clipped overshoot area — fluid is contained, but the wall
     // itself never paints inside the visible viewport.
@@ -246,6 +230,7 @@ export function LiquidMetal({
             setup={setup}
             fillSection={fillSection}
             canvasOverflow={edgeBarrier}
+            resolutionScale={resolutionScale}
         >
             {children}
         </ShaderCanvas>
