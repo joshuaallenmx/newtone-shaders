@@ -1,6 +1,6 @@
 {
     "name": "@newtonedev/shaders",
-    "version": "0.2.1",
+    "version": "0.2.2",
     "description": "Newtone GPU shader pipeline — Pass/Pipeline runtime, signal-driven uniforms, texture utilities, and ready-made shaders for React + Three.js",
     "license": "MIT",
     "repository": {
@@ -34,7 +34,8 @@
         "typecheck": "tsc --noEmit",
         "playground": "vite playground --open",
         "playground:next": "vite playground-next --open",
-        "playground:editor": "vite playground-editor --open"
+        "playground:editor": "vite playground-editor --open",
+        "playground:liquid-metal": "vite playground-liquid-metal --open"
     },
     "peerDependencies": {
         "react": ">=18.0.0",
