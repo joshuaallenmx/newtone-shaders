@@ -152,6 +152,26 @@ export function LiquidMetal({
             }, ms),
         );
 
+        // Coalesced, frame-deferred mask rebuild. A resize re-scales the DOM
+        // `<Display>` that feeds the mask, but that re-layout lands a frame
+        // later — React re-render plus the Display's own ResizeObserver fire
+        // *after* the canvas ResizeObserver that drives `onResize`. Rebuilding
+        // synchronously in `onResize` therefore rasterizes the stale,
+        // pre-resize glyph geometry, and nothing guarantees a later rebuild —
+        // so the mask keeps the previous size until the page reloads. Deferring
+        // to the next frame captures the settled layout; the flag coalesces a
+        // burst of resize ticks into one rebuild.
+        let rebuildRaf = 0;
+        const scheduleRebuild = () => {
+            if (rebuildRaf !== 0) return;
+            rebuildRaf = requestAnimationFrame(() => {
+                rebuildRaf = requestAnimationFrame(() => {
+                    rebuildRaf = 0;
+                    void maskBuilder.rebuild();
+                });
+            });
+        };
+
         const { config } = createLiquidMetalPipelineConfig({
             signals: { pointer, scroll },
             textures: {
@@ -175,11 +195,16 @@ export function LiquidMetal({
             signals,
             time,
             onResize: () => {
+                // Rebuild now so the mask canvas tracks the new render
+                // resolution immediately (no stretch), then again on the next
+                // frame once the `<Display>` has re-laid-out at the new size.
                 void maskBuilder.rebuild();
+                scheduleRebuild();
             },
             dispose: () => {
                 offMutation();
                 retryTimers.forEach(clearTimeout);
+                if (rebuildRaf !== 0) cancelAnimationFrame(rebuildRaf);
                 noise.dispose();
                 env.dispose();
                 maskBuilder.dispose();
